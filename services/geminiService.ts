@@ -2,14 +2,32 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export class GeminiService {
-  private ai: GoogleGenAI;
+  private ai: GoogleGenAI | null = null;
+  private hasKey: boolean = false;
 
   constructor() {
-    // Initialized GoogleGenAI using process.env.API_KEY directly as per guidelines
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = process.env.API_KEY;
+    if (apiKey && apiKey !== 'undefined') {
+      try {
+        this.ai = new GoogleGenAI({ apiKey });
+        this.hasKey = true;
+      } catch (e) {
+        console.error("Gemini SDK initialization failed", e);
+      }
+    } else {
+      console.warn("Gemini API Key is missing. AI features will be disabled.");
+    }
+  }
+
+  isAvailable(): boolean {
+    return this.hasKey && this.ai !== null;
   }
 
   async parseTaskInput(input: string, baseDate: string) {
+    if (!this.ai) {
+      throw new Error("AI Service is not initialized (missing API Key)");
+    }
+
     const response = await this.ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
@@ -38,7 +56,6 @@ export class GeminiService {
     });
 
     try {
-      // Direct access to .text property as it is a getter
       return JSON.parse(response.text || '[]');
     } catch (e) {
       console.error("Failed to parse Gemini response", e);
